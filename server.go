@@ -23,7 +23,7 @@ func init() {
 	flag.IntVar(&listenPort, "port", 6666, "listen port")
 	flag.IntVar(&passPeriod, "t", 10, "seconds for one period")
 	flag.IntVar(&passNumber, "c", 10, "token quata to dispatch in one period")
-	flag.IntVar(&maxSeats, "max", 10000, "token quata to dispatch in one period")
+	flag.IntVar(&maxSeats, "max", 1000000, "token quata to dispatch in one period")
 
 	flag.BoolVar(&helpMe, "h", false, "help")
 	flag.BoolVar(&helpMe, "help", false, "help")
