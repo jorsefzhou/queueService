@@ -41,6 +41,7 @@ func CreateCluster(
 	for i := 0; i < concurrentClients; i++ {
 		// generate uid 
 		uid := RandStringRunes(10)
+		//uid := "asdfasdfasdfa" + strconv.Itoa(i)
 		clientCluster.createClient(targetIp, targetPort, uid)
 	}
 

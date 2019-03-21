@@ -14,6 +14,7 @@ type CS struct {
 	Wch chan []byte
 	Dch chan []byte
 	Cch chan bool
+	conn net.Conn
 	uid   string
 	t     int64
 	pos   int64
@@ -220,7 +221,14 @@ func (s *Server) sHandler(conn net.Conn) {
 				C = cs.(*CS)
 				if C.offline {
 					// reconnect
+					//fmt.Println("reconnect")
 					C.offline = false
+
+					// close formal go routine
+					C.Cch <- true
+					C.conn = conn
+					s.tellClientCurrentPos(C)
+					
 				} else {
 					// already connected, ignore
 					conn.Close()
@@ -236,9 +244,10 @@ func (s *Server) sHandler(conn net.Conn) {
 			s.queueChan <- uid
 			s.activeClientsMap.Set(uid, C)
 
+			C.conn = conn
 			// go write handler and read handler
-			go s.sWHandler(conn, C)
-			go s.sRHandler(conn, C)
+			go s.sWHandler(C)
+			go s.sRHandler(C)
 			
 			// inform client current position
 			s.tellClientCurrentPos(C)
@@ -262,16 +271,16 @@ func (s *Server) tellClientCurrentPos(C *CS) {
 	C.Wch <- AssemblePacket(Res_CURRENT_POS, Int32ToBytes(position))
 }
 
-func (s *Server) sWHandler(conn net.Conn, C *CS) {
+func (s *Server) sWHandler(C *CS) {
 	for {
 		select {
 		case d := <-C.Wch:
-			conn.Write(d)
+			C.conn.Write(d)
 
 		case d := <- C.Dch:
 			// work done, write data and close in one second
 			//fmt.Println("work done coroutine")
-			conn.Write(d)
+			C.conn.Write(d)
 
 			go func() {
 				time.Sleep(1 * time.Second)
@@ -288,22 +297,22 @@ func (s *Server) sWHandler(conn net.Conn, C *CS) {
 }
 
 
-func (s *Server) sRHandler(conn net.Conn, C *CS) {
+func (s *Server) sRHandler(C *CS) {
 	for {
 		// check if connection is broken
 		data := make([]byte, 128)
-		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-		_, err := conn.Read(data)
+		C.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, err := C.conn.Read(data)
 
 		if err != nil {	
 			if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 				//timeout, go on
 			} else {
 				//fmt.Println("connection is closed", C.uid)
-				conn.Close()
+				C.conn.Close()
 				//fmt.Println("set offline", true)
 				C.offline = true
-				conn = nil
+				C.conn = nil
 				return 
 			}
 		}
