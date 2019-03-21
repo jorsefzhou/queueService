@@ -1,5 +1,8 @@
 package queue
 
+//import _ "net/http/pprof"
+//import  "net/http"
+
 // server
 import (
 	"fmt"
@@ -56,6 +59,10 @@ func CreateServer(
 	passPeriod   int,
 	passNumber   int,
 	maxSeats     int,) *Server {
+
+//	go func() {
+//			fmt.Println(http.ListenAndServe("localhost:6060", nil))
+//	}()
 
 	server := &Server{
 		activeClientsMap: New(),
@@ -128,13 +135,15 @@ func (s *Server) dispatchPass() {
 				token := "you are passed!"
 
 				if cs, ok := s.activeClientsMap.Get(uid); !ok {
-					fmt.Println("conn die, close WHandler", uid)
+					//fmt.Println("conn die, close WHandler", uid)
 				} else {
 					tcs := cs.(*CS)
 
 					if tcs.offline {
 						s.setCurrentQueueHeadPosValue(tcs.pos)
 						s.activeClientsMap.Remove(uid)	
+						close(tcs.Cch)
+
 						continue
 					}
 					
@@ -221,14 +230,12 @@ func (s *Server) sHandler(conn net.Conn) {
 				C = cs.(*CS)
 				if C.offline {
 					// reconnect
-					//fmt.Println("reconnect")
 					C.offline = false
-
-					// close formal go routine
-					C.Cch <- true
+	
 					C.conn = conn
 					s.tellClientCurrentPos(C)
 					
+					return
 				} else {
 					// already connected, ignore
 					conn.Close()
@@ -312,8 +319,9 @@ func (s *Server) sRHandler(C *CS) {
 				C.conn.Close()
 				//fmt.Println("set offline", true)
 				C.offline = true
-				C.conn = nil
-				return 
+				
+				// sleep one second
+				time.Sleep(1000 * time.Millisecond)
 			}
 		}
 		
