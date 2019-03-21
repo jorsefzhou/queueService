@@ -40,8 +40,7 @@ func CreateCluster(
 
 	for i := 0; i < concurrentClients; i++ {
 		// generate uid 
-		//uid := RandStringRunes(10)
-		uid := "asdfasdfasdfa" + string(i)
+		uid := RandStringRunes(10)
 		clientCluster.createClient(targetIp, targetPort, uid)
 	}
 
