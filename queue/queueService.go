@@ -14,8 +14,7 @@ import (
 
 type CS struct {
 	Rch chan []byte
-	Wch chan []byte
-	Dch chan []byte
+	Wch chan ChannelMsg
 	Cch chan bool
 	conn net.Conn
 	uid   string
@@ -24,11 +23,15 @@ type CS struct {
 	offline  bool
 }
 
+type ChannelMsg struct {
+    req  byte
+    data []byte
+}
+
 func NewCs(uid string, pos int64) *CS {
 	return &CS { 
 		Rch: make(chan []byte),  // read data channel
-		Wch: make(chan []byte),  // write data channel
-		Dch: make(chan []byte),    // work done channel
+		Wch: make(chan ChannelMsg),  // write data channel
 		Cch: make(chan bool),    // clear resource channel
 		uid: uid, 
 		pos : pos, 
@@ -147,7 +150,8 @@ func (s *Server) dispatchPass() {
 						continue
 					}
 					
-					tcs.Dch <- AssemblePacket(Res_GET_TOKEN, []byte(token))
+					// send channel msg
+					tcs.Wch <- ChannelMsg {Res_GET_TOKEN, []byte(token)}
 					
 					// set current queue head pos
 					s.setCurrentQueueHeadPosValue(tcs.pos)
@@ -185,14 +189,25 @@ func (s *Server) setCurrentQueueHeadPosValue(val int64) {
 func (s *Server) broadcastPosition() {
 	fmt.Println("broadcast queue position, current waiting user count: ", s.activeClientsMap.Count())
 
-	s.activeClientsMap.IterCb(func(key string, val interface{}) {
+	// modify to prevent server deadlock
+	items := s.activeClientsMap.Items()
+
+	for _, value := range items {
+		v := value.(*CS)
+
+		if !v.offline {
+			s.tellClientCurrentPos(v)
+		}
+	}
+
+	/*
+	items.IterCb(func(key string, val interface{}) {
 		v := val.(*CS)
 
 		if !v.offline {
 			s.tellClientCurrentPos(v)
 		}
-	})
-
+	})*/
 }
 
 
@@ -275,26 +290,25 @@ func (s *Server) sHandler(conn net.Conn) {
 
 func (s *Server) tellClientCurrentPos(C *CS) {
 	position := int32(C.pos - atomic.LoadInt64(&s.currentQueueHeadPos))
-	C.Wch <- AssemblePacket(Res_CURRENT_POS, Int32ToBytes(position))
+	C.Wch <- ChannelMsg {Res_CURRENT_POS, Int32ToBytes(position)}
 }
 
 func (s *Server) sWHandler(C *CS) {
 	for {
 		select {
-		case d := <-C.Wch:
-			C.conn.Write(d)
+		case msg := <-C.Wch:
+			
+			data := AssemblePacket(msg.req, msg.data)
+			C.conn.Write(data)
 
-		case d := <- C.Dch:
-			// work done, write data and close in one second
-			//fmt.Println("work done coroutine")
-			C.conn.Write(d)
-
-			go func() {
-				time.Sleep(1 * time.Second)
-				close(C.Cch)
-			}()
-			return 
-		
+			if msg.req == Res_GET_TOKEN {
+				// work done, write data and close in one second
+				go func() {
+					time.Sleep(1 * time.Second)
+					close(C.Cch)
+				}()
+				return 
+			}
 
 		case <- C.Cch:
 			//fmt.Println("close sWHandler goroutine")
