@@ -197,6 +197,10 @@ func (s *Server) sHandler(conn net.Conn) {
 
 	var C *CS
 	for {
+		if conn == nil {
+			return
+		}
+
 		conn.Read(data)
 		_, index, content := DisassemblePacket(data)
 
