@@ -124,7 +124,7 @@ func (s *Server) dispatchPass() {
 				time.Sleep(1000 * time.Millisecond)
 
 				if needBroadcast {
-					go s.broadcastPosition()
+					s.broadcastPosition()
 					fmt.Println(i, "users authenticated")
 					needBroadcast = false
 				}
@@ -144,7 +144,7 @@ func (s *Server) dispatchPass() {
 
 					if tcs.offline {
 						s.setCurrentQueueHeadPosValue(tcs.pos)
-						s.activeClientsMap.Remove(uid)	
+						s.activeClientsMap.Remove(uid)
 						close(tcs.Cch)
 
 						continue
@@ -163,7 +163,7 @@ func (s *Server) dispatchPass() {
 				time.Sleep(1000 * time.Millisecond)
 				
 				if needBroadcast {
-					go s.broadcastPosition()
+					s.broadcastPosition()
 					fmt.Println(i, "users authenticated")
 					needBroadcast = false
 				}
