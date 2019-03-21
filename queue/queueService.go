@@ -189,25 +189,13 @@ func (s *Server) setCurrentQueueHeadPosValue(val int64) {
 func (s *Server) broadcastPosition() {
 	fmt.Println("broadcast queue position, current waiting user count: ", s.activeClientsMap.Count())
 
-	// modify to prevent server deadlock
-	items := s.activeClientsMap.Items()
-
-	for _, value := range items {
-		v := value.(*CS)
-
-		if !v.offline {
-			s.tellClientCurrentPos(v)
-		}
-	}
-
-	/*
-	items.IterCb(func(key string, val interface{}) {
+	s.activeClientsMap.IterCb(func(key string, val interface{}) {
 		v := val.(*CS)
 
 		if !v.offline {
 			s.tellClientCurrentPos(v)
 		}
-	})*/
+	})
 }
 
 
